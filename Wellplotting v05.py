@@ -11,6 +11,7 @@ from PySide.QtCore import *
 from PySide.QtCore import QUrl
 from PySide.QtGui import *
 from PySide.QtWebKit import QWebView
+import math
 
 # TODO: CLEAN OUTLIERS ON A PER 50m basis! Clone the dataframe and step through them.  over a range!  Interpolate
 # TODO: MULTI WELL PAD SETUP
@@ -30,10 +31,12 @@ class MainWindow(QtGui.QMainWindow):
         # title of the window
         self.setWindowTitle('Well Plotter v0.5 Alpha')
         # fix window size
-        self.setFixedSize(600, 270)
+        self.resize(800, 300)
         # status bar with initial message
         self.statusBar().showMessage('Ready to plot')
         self.setWindowIcon(QtGui.QIcon('oilrig.png'))
+        global KB
+        KB=0
 
         # Layout
         cWidget = QtGui.QWidget(self)
@@ -45,29 +48,40 @@ class MainWindow(QtGui.QMainWindow):
         quitAction.setStatusTip('Quit the Application')
         quitAction.triggered.connect(self.close_application)
 
+        quickTVD = QtGui.QAction("Extrapolate", self)
+        quickTVD.setShortcut("Ctrl+E")
+        quickTVD.setStatusTip('Extrapolate Wellpath holding INC')
+        quickTVD.triggered.connect(self.quickTVD)
+
         self.statusBar()
 
         mainMenu = self.menuBar()
         fileMenu = mainMenu.addMenu('&File')
+        toolsMenu = mainMenu.addMenu('&Tools')
         aboutMenu = mainMenu.addMenu('&About')
         fileMenu.addAction(quitAction)
+        toolsMenu.addAction(quickTVD)
         # aboutMenu.addAction(self.testWindow)
 
 
         Button_input1 = QtGui.QPushButton("Import Surveys")
         grid.addWidget(Button_input1, 0, 0)
         Button_input1.clicked.connect(self.importSurveys)
-        surveysPathBox = self.survTextBox = QtGui.QTextEdit(self)
+        surveysPathBox = self.survTextBox = QtGui.QLineEdit(self)
+        self.survTextBox.setReadOnly(True)
+
 
         Button_input2 = QtGui.QPushButton("Import Gamma")
         grid.addWidget(Button_input2, 1, 0)
         Button_input2.clicked.connect(self.importGamma)
-        gammaPathBox = self.gammaTextBox = QtGui.QTextEdit(self)
+        gammaPathBox = self.gammaTextBox = QtGui.QLineEdit(self)
+        self.gammaTextBox.setReadOnly(True)
 
         Button_input3 = QtGui.QPushButton("Import ROP and Gas")
         grid.addWidget(Button_input3, 2, 0)
         Button_input3.clicked.connect(self.importROPandGas)
-        ropPathBox = self.ropTextBox = QtGui.QTextEdit(self)
+        ropPathBox = self.ropTextBox = QtGui.QLineEdit(self)
+        self.ropTextBox.setReadOnly(True)
 
         Button_input4 = QtGui.QPushButton("Generate WellPlot")
         grid.addWidget(Button_input4, 3, 0)
@@ -85,9 +99,9 @@ class MainWindow(QtGui.QMainWindow):
         grid.addWidget(Button_input7, 6, 0)
         Button_input7.clicked.connect(self.writeSpreadsheet)
 
-        Button_input8 = QtGui.QPushButton("Quick TVD Estimation")
-        grid.addWidget(Button_input8, 7, 0)
-        Button_input8.clicked.connect(self.quickTVD)
+        # Button_input8 = QtGui.QPushButton("Quick Extrapolations")
+        # grid.addWidget(Button_input8, 7, 0)
+        # Button_input8.clicked.connect(self.quickTVD)
 
         grid.addWidget(surveysPathBox, 0, 1)
         grid.addWidget(gammaPathBox, 1, 1)
@@ -102,7 +116,7 @@ class MainWindow(QtGui.QMainWindow):
         #                                                  "TXT Files (*.txt *.TXT)")
         # fileName2 = fileName2tup[0]
 
-        fileName2 = 'C:/Users/Brett/Desktop/Wellplotting/TD Surveys.TXT'
+        fileName2 = 'C:/Users/Brett/Desktop/Python Projects/Wellplotting/TD Surveys.TXT'
 
         self.survTextBox.setText(fileName2)
 
@@ -168,7 +182,7 @@ class MainWindow(QtGui.QMainWindow):
         #                                                 "LAS Files (*.las *.LAS)")
         # fileName = fileNametup[0]
 
-        fileName = 'C:/Users/Brett/Desktop/Wellplotting/TD Gamma.las'
+        fileName = 'C:/Users/Brett/Desktop/Python Projects/Wellplotting/TD Gamma.las'
 
         self.gammaTextBox.setText(fileName)
         # Find the header line number in gamma file
@@ -195,7 +209,7 @@ class MainWindow(QtGui.QMainWindow):
         #                                                  "Pason Gas and ROP Files (*.txt *.TXT)")
         # fileName3 = fileName3tup[0]
 
-        fileName3 = 'C:/Users/Brett/Desktop/Wellplotting/TD Gas and ROP.txt'
+        fileName3 = 'C:/Users/Brett/Desktop/Python Projects/Wellplotting/TD Gas and ROP.txt'
         gasandropFile = open(fileName3, 'r')
 
         self.ropTextBox.setText(fileName3)
@@ -618,68 +632,129 @@ class MainWindow(QtGui.QMainWindow):
         sys.exit()
 
     def quickTVD(self):
-
         # TVDNum = 0
 
-        def blah():
-            TVD = float(le.text())
-            MD = float(le2.text())
-            INC = float(le3.text())
 
-            print('TVD is ' + str(TVD) + ' MD is ' + str(MD) + ' INC is ' + str(INC))
+
+        def extrapToTVD():
+            #Need the TVD to extrapolate to inputted, Subtract extrapTVD from initTVD (adjacent) / hypoteneuse
+            knownTVD, ok = QInputDialog.getDouble(self.wid, "Input", "Enter the TVD to extrapolate to", decimals = 2)
+
+            initTVD = float(le.text())
+            initMD = float(le2.text())
+            initINC = float(le3.text())
+            extrapKB = float(le5.text())
+
+            extrapMD = (((knownTVD - initTVD) / (math.cos(math.radians(initINC)))) + (initMD))
+            le4.setText('Held at an inclination of ' + str(initINC) + '°, ' + str(knownTVD) + 'mTVD will be reached at ' + str(round(extrapMD, 2)) + ' mMD.')
+            self.wid.raise_()
+
+        def extrapToMD():
+            # Need the TVD to extrapolate to inputted, Subtract extrapTVD from initTVD (adjacent) / hypoteneuse
+            knownMD, ok = QInputDialog.getDouble(self.wid, "Input", "Enter the MD to extrapolate to", decimals=2)
+
+            initTVD = float(le.text())
+            initMD = float(le2.text())
+            initINC = float(le3.text())
+            extrapKB = float(le5.text())
+
+            extrapTVD = ((math.cos(math.radians(initINC)) * (knownMD - initMD)) + initTVD)
+            #((COS(RADIANS(C4))*(C14-C6))+(C5))
+
+            le6.setText('Held at an inclination of ' + str(initINC) + '°, ' + str(knownMD) + 'mMD will be reached at ' + str(round(extrapTVD, 2)) + ' mTVD.')
+            # self.wid.raise_()
+
 
         def getTVDint():
-            TVDNum, ok = QInputDialog.getInt(self, "integer input dialog", "enter a number")
+            TVDNum, ok = QInputDialog.getDouble(self.wid, "Input", "Enter the current TVD", decimals = 2)
 
             if ok:
                 le.setText(str(TVDNum))
 
+            # self.wid.raise_()
+
+        def kbSet():
+            extrapKB, ok = QInputDialog.getDouble(self.wid, "Input", "Enter the current KBr", decimals = 2)
+
+            if ok:
+                le5.setText(str(extrapKB))
+            # self.wid.raise_()
+
         def getMDint():
-            num, ok = QInputDialog.getInt(self, "integer input dialog", "enter a number")
+            num, ok = QInputDialog.getDouble(self.wid, "Input", "Enter the current MD", decimals = 2)
 
             if ok:
                 le2.setText(str(num))
+            # self.wid.raise_()
 
         def getIncint():
-            num, ok = QInputDialog.getInt(self, "integer input dialog", "enter a number")
+            num, ok = QInputDialog.getDouble(self.wid, "Input", "Enter the current Inclination", decimals = 2)
 
             if ok:
                 le3.setText(str(num))
+            # self.wid.raise_()
 
         self.wid = QtGui.QWidget()
-        self.wid.resize(500, 300)
-        self.wid.setWindowTitle('TVD Extrapolation')
+        self.wid.resize(800, 400)
+        self.wid.setWindowTitle('Quick Extrapolation')
         self.wid.setWindowIcon(QtGui.QIcon('oilrig.png'))
+
+
         self.wid.show()
+
 
 
         grid = QtGui.QGridLayout(self.wid)
 
 
         le = QLineEdit()
+        le.setReadOnly(True)
         le2 = QLineEdit()
+        le2.setReadOnly(True)
         le3 = QLineEdit()
+        le3.setReadOnly(True)
         le4 = QLineEdit()
+        le4.setReadOnly(True)
+        le5 = QLineEdit()
+        le5.setReadOnly(True)
+        le6 = QLineEdit()
+        le6.setReadOnly(True)
 
-        Button_input1 = QtGui.QPushButton("Enter TVD")
+        if KB > 0:
+            extrapKB = KB
+            le5.setText(str(extrapKB))
+
+
+
+        Button_input1 = QtGui.QPushButton("Enter Known TVD")
         grid.addWidget(Button_input1, 1, 0)
         grid.addWidget(le, 1, 1)
         Button_input1.clicked.connect(getTVDint)
 
-        Button_input2 = QtGui.QPushButton("Enter MD")
+        Button_input2 = QtGui.QPushButton("Enter Known MD")
         grid.addWidget(Button_input2, 2, 0)
         grid.addWidget(le2, 2, 1)
         Button_input2.clicked.connect(getMDint)
 
-        Button_input3 = QtGui.QPushButton("Enter INC")
+        Button_input3 = QtGui.QPushButton("Enter Known INC")
         grid.addWidget(Button_input3, 3, 0)
         grid.addWidget(le3, 3, 1)
         Button_input3.clicked.connect(getIncint)
 
-        Button_input4 = QtGui.QPushButton("Extrapolate")
-        grid.addWidget(Button_input4, 4, 0)
-        grid.addWidget(le4, 4, 1)
-        Button_input4.clicked.connect(blah)
+        Button_input4 = QtGui.QPushButton("Extrapolate to specified TVD")
+        grid.addWidget(Button_input4, 5, 0)
+        grid.addWidget(le4, 5, 1)
+        Button_input4.clicked.connect(extrapToTVD)
+
+        Button_input5= QtGui.QPushButton("KB")
+        grid.addWidget(Button_input5, 4, 0)
+        grid.addWidget(le5, 4, 1)
+        Button_input5.clicked.connect(kbSet)
+
+        Button_input6 = QtGui.QPushButton("Extrapolate to specified MD")
+        grid.addWidget(Button_input6, 6, 0)
+        grid.addWidget(le6, 6, 1)
+        Button_input6.clicked.connect(extrapToMD)
 
 
 def main():
